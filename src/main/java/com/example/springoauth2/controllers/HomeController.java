@@ -56,8 +56,9 @@ public class HomeController {
 
     @SneakyThrows
     @GetMapping("/sso/login")
-    public ResponseEntity ssoLogin(Model model) {
-        String callback = URLEncoder.encode("http://localhost:8080/callback", "utf-8");
+    public ResponseEntity ssoLogin(HttpServletRequest request, Model model) {
+        int port = request.getServerPort();
+        String callback = URLEncoder.encode("http://localhost:" + port + "/callback", "utf-8");
         String url = ssoEndpoint + "/sso/oauth2?response_type=code&client_id=" + clientId + "&redirect_uri=" + callback;
         return ResponseEntity.status(HttpStatus.MOVED_PERMANENTLY).location(new URI(url)).build();
     }
