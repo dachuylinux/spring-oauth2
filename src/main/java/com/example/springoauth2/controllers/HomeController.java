@@ -44,8 +44,14 @@ public class HomeController {
     private String lgspToken;
 
     @GetMapping(value = {"/", "/home"})
-    public String home(Model model, @RequestParam(name = "access_token", required = false, defaultValue = "abc") String accessToken) {
+    public String home(Model model,
+                       @RequestParam(name = "access_token", required = false, defaultValue = "") String accessToken,
+                       @RequestParam(name = "refresh_token", required = false, defaultValue = "") String refreshToken,
+                       @RequestParam(name = "id_token", required = false, defaultValue = "") String idToken) {
         model.addAttribute("accessToken", accessToken);
+        model.addAttribute("refreshToken", refreshToken);
+        model.addAttribute("idToken", idToken);
+        model.addAttribute("clientId", clientId);
         return "home";
     }
 
@@ -66,25 +72,21 @@ public class HomeController {
 
     @SneakyThrows
     @GetMapping("/sso/logout")
-    public ResponseEntity ssoLogout(Model model, @RequestParam(name = "access_token") String accessToken) {
-        String logoutnEdpoint = lgspEndpoint + "/sso/oauth2/logout";
-        JSONObject obj = new JSONObject();
-        obj.put("access_token", accessToken);
-        obj.put("client_id", this.clientId);
-        obj.put("client_secret", this.secretKey);
+    public ResponseEntity ssoLogout(HttpServletRequest request, Model model, @RequestParam(name = "id_token") String idToken) {
+        //1. thực hiện logout ở client
+        //2. gửi request tới cổng xác thực yêu cầu single logout những ứng dụng đang dùng chung session
+        //client_id: (bắt buộc)
+        //id_token_hint: (bắt buộc) giá trị ở bước get access_token
+        //post_logout_redirect_uri: giá trị khi logout thành công, sẽ redirect về
+        SecurityContextHolder.clearContext();
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set(HttpHeaders.AUTHORIZATION, lgspToken);
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<String> req = new HttpEntity<>(obj.toString(), headers);
-        ResponseEntity<String> response = new RestTemplate().postForEntity(logoutnEdpoint, req, String.class);
-        JSONObject res = new JSONObject(response.getBody());
-        if (res.getInt("code") == 0) {
-            return ResponseEntity.status(HttpStatus.MOVED_PERMANENTLY).location(new URI("/logout")).build();
-        }
-        return null;
+        String idTokenEncode = URLEncoder.encode(idToken, "utf-8");
+        String postLogoutRedirectUri = URLEncoder.encode("http://localhost:" + request.getServerPort() + "/home", "utf-8");
+        String sloRequest = lgspEndpoint + "/oidc/logout?client_id=" + clientId + "&id_token_hint=" + idTokenEncode + "&post_logout_redirect_uri=" + postLogoutRedirectUri;
+        return ResponseEntity.status(HttpStatus.MOVED_PERMANENTLY).location(new URI(sloRequest)).build();
     }
 
+    @SneakyThrows
     @GetMapping("/callback")
     public String callback(HttpServletRequest request, @RequestParam(required = false) String code) {
         if (code != null && !code.isEmpty()) {
@@ -102,7 +104,10 @@ public class HomeController {
             ResponseEntity<String> response = new RestTemplate().postForEntity(tokenEndPoint, req, String.class);
             JSONObject res = new JSONObject(response.getBody());
             if (res.getInt("code") == 0) {
+                System.out.println(res.toString());
                 String accessToken = res.getJSONObject("data").getString("access_token");
+                String refreshToken = res.getJSONObject("data").getString("refresh_token");
+                String idToken = res.getJSONObject("data").getString("id_token");
                 //get user info not implement
                 //fake user data loged, put to SecurityContextHolder
                 if (true) {
@@ -114,7 +119,7 @@ public class HomeController {
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
-                return "redirect:/home?access_token=" + accessToken;
+                return "redirect:/home?access_token=" + accessToken + "&refresh_token=" + refreshToken + "&id_token=" + URLEncoder.encode(idToken, "utf-8");
             }
         }
         return "";

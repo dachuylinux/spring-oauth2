@@ -5,8 +5,11 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
 </head>
 <body>
-<p th:text="'Hello, access_token is: ' + ${accessToken} + '!'"/>
+<p th:text="'Hello'"/><br/>
+<p th:text="'access_token is: ' + ${accessToken}"/><br/>
+<p th:text="'refresh_token is: ' + ${refreshToken}"/><br/>
+<p th:text="'id_token is: ' + ${idToken}"/><br/>
 <br/>
-<a th:href="'/sso/logout?access_token='+${accessToken}">click to sso logout</a>
+<a th:href="'/sso/logout?id_token='+${idToken}">click to sso logout</a>
 </body>
 </html>
